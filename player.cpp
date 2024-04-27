@@ -34,9 +34,30 @@
 // constexpr OUStringLiteral AVMEDIA_WIN_PLAYER_IMPLEMENTATIONNAME = u"com.sun.star.comp.avmedia.Player_DirectX";
 // constexpr OUStringLiteral AVMEDIA_WIN_PLAYER_SERVICENAME = u"com.sun.star.media.Player_DirectX";
 
+constexpr GUID CLSID_LAVVideoDecoder = { 0xEE30215D, 0x164F, 0x4A92, {0xA4, 0xEB, 0x9D, 0x4C, 0x13, 0x39, 0x0F, 0x9F} };
+constexpr GUID CLSID_LAVAudioDecoder = { 0xE8E73B6B, 0x4CB3, 0x44A4, {0xBE, 0x99, 0x4F, 0x7B, 0xCB, 0x96, 0xE4, 0x91} };
+
 using namespace ::com::sun::star;
 
 namespace avmedia::win {
+
+HRESULT AddFilterByCLSID(IGraphBuilder* pGraph, const GUID& clsid, LPCWCHAR wszName, IBaseFilter** ppF)
+{
+    if (!pGraph || !ppF)
+        return E_POINTER;
+    *ppF = NULL;
+    IBaseFilter* pF = NULL;
+    HRESULT hr = CoCreateInstance(clsid, NULL, CLSCTX_INPROC_SERVER, IID_IBaseFilter, reinterpret_cast<void**>(&pF));
+    if (SUCCEEDED(hr))
+    {
+        hr = pGraph->AddFilter(pF, wszName);
+        if (SUCCEEDED(hr))
+            *ppF = pF;
+        else
+            pF->Release();
+    }
+    return hr;
+}
 
 static LRESULT CALLBACK MediaPlayerWndProc_2( HWND hWnd,UINT nMsg, WPARAM nPar1, LPARAM nPar2 )
 {
@@ -106,6 +127,11 @@ bool Player::create( const rtl::OUString& rURL )
         rtl::OUString aFile(rURL);
         if (aFile.startsWithIgnoreAsciiCase("file:"))
             osl::FileBase::getSystemPathFromFileURL(rURL, aFile);
+
+        IBaseFilter* pLAVVideoDecoder = NULL;
+        IBaseFilter* pLAVAudioDecoder = NULL;
+        AddFilterByCLSID(mpGB.get(), CLSID_LAVVideoDecoder, L"LAV Video Decoder", &pLAVVideoDecoder);
+        AddFilterByCLSID(mpGB.get(), CLSID_LAVAudioDecoder, L"LAV Audio Decoder", &pLAVAudioDecoder);
 
         if( SUCCEEDED( mpGB->RenderFile( aFile.getStr(), nullptr ) ) &&
             mpMC.set(mpGB, sal::systools::COM_QUERY) &&
