@@ -1,0 +1,1 @@
+# LibreOffice AVMedia Module (Compiled Separately on Windows)
